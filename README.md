@@ -48,6 +48,14 @@ export OPENAI_MODEL=gpt-4o-mini  # or any chat model id
 # Google Gemini
 export GEMINI_API_KEY=...
 export GEMINI_MODEL=gemini-1.5-flash
+
+# DeepSeek
+export DEEPSEEK_API_KEY=...
+export DEEPSEEK_MODEL=deepseek-chat
+
+# ChatGLM (ZhipuAI)
+export CHATGLM_API_KEY=...
+export CHATGLM_MODEL=glm-4-flash
 ```
 
 If no keys are found, the LLM agent falls back to a deterministic **heuristic** model so the
