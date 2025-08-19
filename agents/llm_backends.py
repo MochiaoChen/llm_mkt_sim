@@ -18,6 +18,16 @@ Backends
     GEMINI_API_KEY
     GEMINI_MODEL (default: gemini-1.5-flash)
 
+- DeepSeekBackend: uses DeepSeek's OpenAI-compatible API.
+  env:
+    DEEPSEEK_API_KEY
+    DEEPSEEK_MODEL (default: deepseek-chat)
+
+- ChatGLMBackend: uses ZhipuAI's ChatGLM API.
+  env:
+    CHATGLM_API_KEY
+    CHATGLM_MODEL (default: glm-4-flash)
+
 - resolve_llm_backend(): returns the first available backend or None.
 
 Contract
@@ -159,6 +169,84 @@ class GeminiBackend:
             return Intent(target_position=0.0, urgency=0.5, max_spread=0.0025, time_horizon=20, note="gemini-fallback")
 
 
+# --------------------
+# DeepSeek (OpenAI API)
+# --------------------
+
+class DeepSeekBackend:
+    def __init__(self, model: Optional[str] = None) -> None:
+        from openai import OpenAI  # lazy import
+
+        api_key = os.getenv("DEEPSEEK_API_KEY")
+        if not api_key:
+            raise RuntimeError("DEEPSEEK_API_KEY not set")
+
+        base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+        self.client = OpenAI(api_key=api_key, base_url=base_url)
+        self.model = model or os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+
+    def propose_intent(self, obs: Observation) -> Intent:
+        try:
+            prompt = _prompt_from_obs(obs)
+            resp = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "You output ONLY compact JSON."},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.3,
+                max_tokens=120,
+            )
+            text = resp.choices[0].message.content or "{}"
+            data = _parse_json_loose(text)
+            return _intent_from_dict(data)
+        except Exception:
+            return Intent(target_position=0.0, urgency=0.5, max_spread=0.0025, time_horizon=20, note="deepseek-fallback")
+
+
+# --------------
+# ChatGLM Backend
+# --------------
+
+class ChatGLMBackend:
+    def __init__(self, model: Optional[str] = None) -> None:
+        import httpx  # lazy import
+
+        api_key = os.getenv("CHATGLM_API_KEY")
+        if not api_key:
+            raise RuntimeError("CHATGLM_API_KEY not set")
+
+        base_url = os.getenv("CHATGLM_BASE_URL", "https://open.bigmodel.cn/api/paas/v4")
+        self.client = httpx.Client(base_url=base_url, timeout=15.0)
+        self.api_key = api_key
+        self.model = model or os.getenv("CHATGLM_MODEL", "glm-4-flash")
+
+    def propose_intent(self, obs: Observation) -> Intent:
+        try:
+            prompt = _prompt_from_obs(obs)
+            payload = {
+                "model": self.model,
+                "messages": [
+                    {"role": "system", "content": "You output ONLY compact JSON."},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.3,
+                "max_tokens": 120,
+            }
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            }
+            resp = self.client.post("/chat/completions", headers=headers, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            text = data.get("choices", [{}])[0].get("message", {}).get("content", "{}")
+            parsed = _parse_json_loose(text)
+            return _intent_from_dict(parsed)
+        except Exception:
+            return Intent(target_position=0.0, urgency=0.5, max_spread=0.0025, time_horizon=20, note="chatglm-fallback")
+
+
 # -------------------------
 # Backend resolution helper
 # -------------------------
@@ -166,7 +254,7 @@ class GeminiBackend:
 def resolve_llm_backend() -> Optional[object]:
     """
     Return an instantiated backend based on available environment variables.
-    Priority: OpenAI -> Gemini. Returns None if neither configured.
+    Priority: OpenAI -> Gemini -> DeepSeek -> ChatGLM. Returns None if none configured.
     """
     try:
         if os.getenv("OPENAI_API_KEY"):
@@ -176,6 +264,16 @@ def resolve_llm_backend() -> Optional[object]:
     try:
         if os.getenv("GEMINI_API_KEY"):
             return GeminiBackend()
+    except Exception:
+        pass
+    try:
+        if os.getenv("DEEPSEEK_API_KEY"):
+            return DeepSeekBackend()
+    except Exception:
+        pass
+    try:
+        if os.getenv("CHATGLM_API_KEY"):
+            return ChatGLMBackend()
     except Exception:
         pass
     return None
