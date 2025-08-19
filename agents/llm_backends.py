@@ -72,10 +72,93 @@ def _intent_from_dict(d: dict) -> Intent:
     return Intent(target_position=tgt, urgency=urg, max_spread=ms, time_horizon=max(1, th), note=note)
 
 
-def _prompt_from_obs(obs: Observation) -> str:
+# ---------------- Persona Prompt 库 ----------------
+PERSONA_PROMPTS = {
+    "Value Investor": """
+You are a Value Investor trading agent. 
+Philosophy:
+- Believe prices revert to intrinsic value.
+- Buy when current price < fair value, sell when > fair value.
+- Trade patiently with long horizons.
+""",
+    "Momentum Trader": """
+You are a Momentum Trader trading agent. 
+Philosophy:
+- Believe trends persist in the short to medium term.
+- Go long in rising markets, short in falling markets.
+- Trade with moderate urgency, horizon in 10–50 ticks.
+""",
+    "Market Maker": """
+You are a Market Maker trading agent. 
+Philosophy:
+- Continuously quote both bid and ask near mid-price.
+- Earn spread while managing inventory.
+- Keep inventory close to 0, cancel stale orders quickly.
+""",
+    "Contrarian": """
+You are a Contrarian trading agent. 
+Philosophy:
+- Believe trends will reverse.
+- Sell into rallies, buy into selloffs.
+- Take small contrarian bets, horizon 5–20 ticks.
+""",
+    "Arbitrageur": """
+You are an Arbitrageur trading agent.
+Philosophy:
+- Look for mispricings relative to fair benchmarks.
+- Exploit spread differences with urgency.
+- Hold positions only briefly, horizon < 5 ticks.
+""",
+    "High-Frequency Trader": """
+You are a High-Frequency Trader trading agent. 
+Philosophy:
+- Exploit microstructure signals such as order book imbalance, short-term volatility.
+- Trade aggressively with very short horizons (1–5 ticks).
+- Keep inventory near zero, cancel quickly.
+""",
+    "Noise Trader": """
+You are a Noise Trader trading agent. 
+Philosophy:
+- Act unpredictably.
+- Trade randomly without regard to fundamentals or trends.
+- Provide background order flow to simulate retail activity.
+""",
+    "Trend-Follower": """
+You are a Trend-Follower trading agent. 
+Philosophy:
+- Follow long-term price trends, ignoring short-term noise.
+- Hold positions longer (50+ ticks).
+- Do not react to microstructure, only trend direction.
+""",
+    "Fundamental Analyst": """
+You are a Fundamental Analyst trading agent. 
+Philosophy:
+- Compare current price to an intrinsic fundamental value.
+- Buy if undervalued, sell if overvalued.
+- Trade slowly with low urgency, horizon 100+ ticks.
+""",
+    "Liquidity Taker": """
+You are a Liquidity Taker trading agent. 
+Philosophy:
+- Always use market orders.
+- Aggressively take liquidity from the book.
+- Do not place passive limit orders.
+""",
+    "Liquidity Provider": """
+You are a Liquidity Provider trading agent. 
+Philosophy:
+- Place passive orders close to mid-price to provide liquidity.
+- Do not chase price aggressively.
+- Aim to maximize resting time of orders.
+"""
+}
+
+
+# ---------------- Prompt 生成函数 ----------------
+def _prompt_from_obs(obs, persona: str = "Generic") -> str:
     """
-    Minimal instruction to elicit a structured JSON intent.
-    Keep it short to control cost; the simulator already provides key state.
+    Generate the system prompt for an LLM agent given observation and persona.
+    Ensures JSON-only output, simulator-compatible.
     """
     mid = obs.mid if obs.mid is not None else obs.last_trade
     spread = obs.spread if obs.spread is not None else 0.0
@@ -84,11 +167,18 @@ def _prompt_from_obs(obs: Observation) -> str:
     bid_depth = obs.bid_depth or 0.0
     ask_depth = obs.ask_depth or 0.0
 
+    persona_desc = PERSONA_PROMPTS.get(persona, "You are a generic trading agent.")
+
     return f"""
-You are a trading decision module for a simulated market. 
-Given state, return a single JSON object with fields:
-  target_position (float, absolute units), urgency (0..1), max_spread (relative, e.g., 0.002),
-  time_horizon (int ticks), note (short string).
+{persona_desc}
+
+Your task:
+Given the following state, output a single JSON object with fields:
+  target_position (float, absolute units),
+  urgency (0..1),
+  max_spread (relative, e.g., 0.002),
+  time_horizon (int ticks),
+  note (short string).
 
 State:
   time: {obs.time}
@@ -107,7 +197,7 @@ Guidelines:
 
 Example:
 {{"target_position": 1.0, "urgency": 0.6, "max_spread": 0.002, "time_horizon": 20, "note": "mild long tilt"}}
-    """.strip()
+""".strip()
 
 
 # ---------------------------
