@@ -1,0 +1,58 @@
+# file: pyproject.toml
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llm-market-sim"
+version = "0.1.0"
+description = "LLM-driven multi-agent financial market simulator with order book, orchestration, and evaluation."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Mochiao & Research Assistant" }]
+
+dependencies = [
+  "numpy>=1.26",
+  "pandas>=2.2",
+  "scipy>=1.12",
+  "pydantic>=2.7",
+  "pyyaml>=6.0",
+  "hydra-core>=1.3",
+  "typer>=0.12",
+  "rich>=13.7",
+  "pyarrow>=15",
+  "sortedcontainers>=2.4",
+  "statsmodels>=0.14",
+  "numba>=0.59",
+  "orjson>=3.9",
+  "matplotlib>=3.8",
+  "httpx>=0.27",
+  "tenacity>=8.2",
+  "openai>=1.40",
+  "google-generativeai>=0.7",
+  "tiktoken>=0.7",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2",
+  "pytest-benchmark>=4.0",
+  "ruff>=0.5",
+  "mypy>=1.10",
+  "types-PyYAML",
+  "jupyter",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["exchange*", "agents*", "orchestration*", "signals*", "eval*", "benchmarks*", "scripts*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "I", "B"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]

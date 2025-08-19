@@ -1,0 +1,32 @@
+# file: .gitignore
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+*.egg-info/
+.dist/
+build/
+dist/
+
+# Virtual envs
+.venv/
+.env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# Outputs
+outputs/
+*.parquet
+*.csv
+*.png
+
+# OS
+.DS_Store
+Thumbs.db
